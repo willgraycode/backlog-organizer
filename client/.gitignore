@@ -9,6 +9,3 @@
 /server/node_modules/
 /server/key.pem
 /server/cert.pem
-
-/client/node_modules/
-/client/.env
