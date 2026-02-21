@@ -1,0 +1,258 @@
+const express = require("express");
+const https = require("https");
+const session = require("express-session");
+const passport = require("passport");
+const SteamSignIn = require("steam-signin");
+const dotenv = require("dotenv");
+const fs = require('fs');
+const path = require('path');
+const helmet = require('helmet');
+const cors = require('cors');
+const axios = require("axios");
+const cheerio = require('cheerio');
+
+const instance = axios.create({
+    baseURL: 'https://store.steampowered.com',
+    withCredentials: true,
+});
+
+const url = 'https://store.steampowered.com/account/history/'; // Replace with the actual URL
+
+async function parseTable() {
+  try {
+    // 1. Fetch the HTML content
+    const response = await instance.get('app/1166860');
+    const html = response.data;
+    console.log('HTML content fetched successfully');
+
+    // 2. Load the HTML into Cheerio
+    const $ = cheerio.load(html);
+
+    console.log('HTML content loaded into Cheerio');
+    // Array to store the extracted data
+    const tableData = [];
+
+    // 3. Select the table and iterate through its rows
+    // Replace 'table_selector' with the actual CSS selector for your table
+    $('.discount_original_price').each((i, row) => {
+      const rowData = $(row).text();
+      console.log(rowData);
+
+      // Push the row data object into the main array
+      tableData.push(rowData);
+    });
+
+    // 5. Output the data (e.g., as JSON)
+    console.log(JSON.stringify(tableData, null, 2));
+
+  } catch (error) {
+    console.error(`Error fetching or parsing the page: ${error}`);
+  }
+}
+
+dotenv.config();
+
+const { SteamOpenIdStrategy } = require("passport-steam-openid");
+
+const realm = process.env.API_URL + ":3000/";
+const signIn = new SteamSignIn(realm);
+
+const app = express();
+
+app.use(helmet());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// allow cross‑origin requests from the React client and forward cookies
+app.use(cors({
+    origin: 'https://127.0.0.1:5173',
+    credentials: true,
+}));
+
+app.use(session({
+    secret: process.env.SECRET,
+    store: new session.MemoryStore(),
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        // we are running HTTPS in development; require secure cookies
+        secure: true,
+        httpOnly: false,
+        sameSite: 'none',
+    }
+}));
+
+app.get('/api/status', (req, res) => {
+    res.json({
+        status: 'operational',
+        timeStamp: new Date().toISOString(),
+        environment: 'development',
+        nodeVersion: process.version,
+    });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
+});
+
+const sslOptions = {
+  key: fs.readFileSync(path.join(__dirname, 'key.pem')),
+  cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
+  // Enable HTTP/2 if available
+  allowHTTP1: true,
+  // Recommended security options
+  minVersion: 'TLSv1.2',
+  ciphers: [
+    'TLS_AES_256_GCM_SHA384',
+    'TLS_CHACHA20_POLY1305_SHA256',
+    'TLS_AES_128_GCM_SHA256',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+    '!DSS',
+    '!aNULL',
+    '!eNULL',
+    '!EXPORT',
+    '!DES',
+    '!RC4',
+    '!3DES',
+    '!MD5',
+    '!PSK'
+  ].join(':'),
+  honorCipherOrder: true
+};
+
+const PORT = 3000;
+const server = https.createServer(sslOptions, app);
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+const gracefulShutdown = (signal) => {
+    console.log(`Received ${signal}. Shutting down gracefully...`);
+    server.close(() => {
+        console.log('Closed out remaining connections.');
+        process.exit(0);
+    });
+
+    // Force shutdown after 10 seconds
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcing shutdown.');
+        process.exit(1);
+    }, 10000);
+};
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+const HOST = process.env.HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
+    console.log(`Server is running at https://${HOST}:${PORT}`);
+    console.log('Environment:', 'development');
+    console.log('Press Ctrl+C to stop the server');
+});
+
+passport.use(new SteamOpenIdStrategy({
+    returnURL: process.env.API_URL + 'api/v1/auth/steam/return',
+    profile: true,
+    apiKey: process.env.STEAM_API_KEY,
+    maxNonceTimeDelay: 30
+}, (req, identifier, profile, done) => {
+    console.log('Steam authentication successful. Identifier:', identifier);
+    console.log('User profile:', profile);
+}));
+
+app.get(`/api/v1/auth/steam`, passport.authenticate('steam-openid'), (req, res) => {
+    // This function will not be called as the request will be redirected to Steam for authentication
+});
+
+app.get('/api/v1/auth/steam/return', async (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    try {
+        console.log("Verifying Steam login...");
+        let steamId = await signIn.verifyLogin(req.url);
+
+        const steamid64 = steamId.getSteamID64();
+        const response = await axios.get(`https://api.steampowered.com/IWishlistService/GetWishlist/v1/?key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`);
+
+        req.session.user = {
+            steamid64,
+        };
+        // make sure session is persisted before sending the redirect
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err);
+            } else {
+                console.log('Steam login verified. User session created:', req.session.user, 'sessionID=', req.sessionID);
+                console.log('Session data:', req.session);
+            }
+            res.redirect('https://127.0.0.1:5173/dashboard');
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).send('There was an error signing in.');
+    }
+});
+
+app.get('/', (req, res) => {
+    const {user} = req.session;
+    res.status(200).send(user);
+});
+
+app.get('/api/v1/steam/owned-games', async (req, res) => {
+    console.log("Fetching owned games for user...");
+    console.log('Session ID:', req.sessionID);
+    console.log('Session data:', req.session);
+    const {user} = req.session;
+    console.log('User session:', user);
+    if (!user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+        const steamid64 = user.steamid64;
+        const response = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?include_appinfo=true&include_extended_appinfo=true&key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`);
+        res.json(response.data);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch owned games' });
+    }
+});
+
+app.get(`/api/v1/steam/details/:appId/price`, async (req, res) => {
+    console.log("Fetching game pricing information for app ID:", req.params.appId);
+    const {appId} = req.params;
+    try {
+        const response = await instance.get(`app/${appId}`);
+        const html = response.data;
+        const $ = cheerio.load(html);
+
+        const baseSelector = '.game_purchase_price';
+        const discountSelector = '.discount_original_price';
+
+        let priceData = 0;
+
+        if ($(baseSelector).length) {
+            const basePrice = $(baseSelector).first().text().trim();
+            priceData = basePrice;
+        } else if ($(discountSelector).length) {
+            const discountPrice = $(discountSelector).first().text().trim();
+            priceData = discountPrice;
+        } else {
+            priceData = -1; // No price data available
+        }
+
+        res.json({ priceData });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch game pricing information' });
+    }
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found' });
+});
