@@ -215,8 +215,13 @@ app.get('/api/v1/steam/owned-games', async (req, res) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     try {
+        console.log("Running..");
         const steamid64 = user.steamid64;
         const response = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?include_appinfo=true&include_extended_appinfo=true&key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`);
+        if(response.data == null)
+        {
+            console.log("Response data is null, user needs to set their game details to public in order to fetch owned games. User Tab -> Profile, Edit Profile -> Privacy Settings -> My Profile -> Game details -> Public");
+        }
         res.json(response.data);
     } catch (error) {
         console.error(error);
