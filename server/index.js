@@ -99,6 +99,7 @@ app.use((err, req, res, next) => {
 const sslOptions = {
   key: fs.readFileSync(path.join(__dirname, 'key.pem')),
   cert: fs.readFileSync(path.join(__dirname, 'cert.pem')),
+  passphrase: 'backlog',
   // Enable HTTP/2 if available
   allowHTTP1: true,
   // Recommended security options
