@@ -5,7 +5,3 @@
 # React Router
 /.react-router/
 /build/
-/../server/.env
-/../server/node_modules/
-/../server/key.pem
-/../server/cert.pem
