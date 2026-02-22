@@ -51,6 +51,7 @@ export default function BacklogTable (props: BacklogTableProps) {
       <Table verticalSpacing="xs">
         <Table.Thead>
           <Table.Tr>
+            <Table.Th></Table.Th>
             <Table.Th>Game Title</Table.Th>
             <Table.Th>Base Price</Table.Th>
             <Table.Th>App ID</Table.Th>
