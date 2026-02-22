@@ -30,7 +30,7 @@ export default function BacklogTable (props: BacklogTableProps) {
         </Table.Td>
         <Table.Td>
             <Text fz="sm" c="dimmed">
-                {game.playtime_forever} mins
+                {Math.floor(game.playtime_forever / 60)} hours {game.playtime_forever % 60} minutes
             </Text>
         </Table.Td>
         <Table.Td>
