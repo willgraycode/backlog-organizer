@@ -1,4 +1,4 @@
-import { Anchor, Group, Table, Text } from "@mantine/core";
+import { Anchor, Group, Table, Text, Image } from "@mantine/core";
 import type { BacklogEntry } from "../BacklogView/BacklogView";
 type BacklogTableProps = {
     ownedGames: BacklogEntry[]
@@ -13,6 +13,9 @@ export default function BacklogTable (props: BacklogTableProps) {
 
     return (
       <Table.Tr key={game.name}>
+        <Table.Td>
+            <Image src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`} w={120} h={50} radius="md"/>
+        </Table.Td>
         <Table.Td>
           <Anchor fz="sm" href={`https://store.steampowered.com/app/${game.appid}`} target="_blank">
             {game.name}
