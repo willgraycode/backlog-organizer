@@ -14,7 +14,7 @@ export default function BacklogTable (props: BacklogTableProps) {
     return (
       <Table.Tr key={game.name}>
         <Table.Td>
-          <Anchor component="button" fz="sm">
+          <Anchor fz="sm" href={`https://store.steampowered.com/app/${game.appid}`} target="_blank">
             {game.name}
           </Anchor>
         </Table.Td>
