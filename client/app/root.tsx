@@ -11,7 +11,17 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { ColorSchemeScript, mantineHtmlProps, MantineProvider } from '@mantine/core';
+import { ColorSchemeScript, colorsTuple, createTheme, mantineHtmlProps, MantineProvider } from '@mantine/core';
+
+const steamTheme = createTheme({
+  colors: {
+    "steamGrey": colorsTuple("#171a21"),
+    "steamLightBlue": colorsTuple("#66c0f4"),
+    "steamDarkBlue": colorsTuple("#1b2838"),
+    "steamBlueGrey": colorsTuple("#2a475e"),
+    "steamWhite": colorsTuple("#c7d5e0"),
+  },
+});
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,7 +34,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <MantineProvider>
+        <MantineProvider theme={steamTheme}>
           {children}
         </MantineProvider>
         <ScrollRestoration />
