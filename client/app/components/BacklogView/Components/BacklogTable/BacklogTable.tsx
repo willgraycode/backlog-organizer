@@ -1,18 +1,20 @@
 import { Anchor, Group, Table, Text, Image } from "@mantine/core";
 import type { BacklogEntry } from "../BacklogView/BacklogView";
+import styles from "./BacklogTable.module.scss";
+
 type BacklogTableProps = {
-    ownedGames: BacklogEntry[]
+    ownedGames: BacklogEntry[];
 }
 
-export default function BacklogTable (props: BacklogTableProps) {
+export default function BacklogTable (props: BacklogTableProps): React.JSX.Element {
     const {
-        ownedGames
+        ownedGames,
     } = props;
 
     const rows = ownedGames.map((game) => {
 
     return (
-      <Table.Tr key={game.name}>
+      <Table.Tr color="#171a21" key={game.name}>
         <Table.Td>
             <Image src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`} w={120} h={50} radius="md"/>
         </Table.Td>
@@ -35,7 +37,7 @@ export default function BacklogTable (props: BacklogTableProps) {
             <Text fz="sm" c="dimmed">
                 {Math.floor(game.playtime_forever / 60)} hours {game.playtime_forever % 60} minutes
             </Text>
-        </Table.Td>
+        </Table.Td>  
         <Table.Td>
             <Text fz="sm" c="dimmed">
                 {game.rtime_last_played ? new Date(game.rtime_last_played * 1000).toLocaleDateString() : "Never played"}
@@ -46,11 +48,11 @@ export default function BacklogTable (props: BacklogTableProps) {
   });
 
 
-  return (<div>
+  return (<div className={styles["backlog-wrapper"]}>
     <Table.ScrollContainer minWidth={800}>
-      <Table verticalSpacing="xs">
+      <Table className={styles["backlog-table"]} borderColor="steamWhite" verticalSpacing="xs" withTableBorder highlightOnHover highlightOnHoverColor="steamWhite">
         <Table.Thead>
-          <Table.Tr>
+          <Table.Tr color="steamDarkBlue">
             <Table.Th></Table.Th>
             <Table.Th>Game Title</Table.Th>
             <Table.Th>Base Price</Table.Th>

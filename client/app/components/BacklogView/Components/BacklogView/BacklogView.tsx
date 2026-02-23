@@ -66,7 +66,6 @@ export default function BacklogView() {
     }, [ownedGames, pricesFetched]);
 
   return <div>
-    <h1>Backlog View</h1>
     <BacklogTable ownedGames={ownedGames}></BacklogTable>
   </div>;
 }
