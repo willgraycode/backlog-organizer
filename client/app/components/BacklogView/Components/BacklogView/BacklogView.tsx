@@ -9,12 +9,9 @@ export interface BacklogEntry {
     playtime_forever: number;
     rtime_last_played: number;
     basePrice?: number | undefined;
-
 }
 
-
 export default function BacklogView() {
-
     const [ownedGames, setOwnedGames] = useState<BacklogEntry[]>([]);
     const [totalOwnedGames, setTotalOwnedGames] = useState(0);
     const [page, setPage] = useState(1);
@@ -96,7 +93,7 @@ export default function BacklogView() {
 
   return (
     <div>
-        <div className="mt-4 flex justify-center">
+        <div className="mb-4 flex justify-center">
         <Pagination
           page={page}
           onChange={setPage}
