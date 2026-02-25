@@ -11,44 +11,15 @@ const cors = require('cors');
 const axios = require("axios");
 const cheerio = require('cheerio');
 
+const getLogPrefix = "GET ---> ";
+const postLogPrefix = "POST ---> ";
+
 const instance = axios.create({
     baseURL: 'https://store.steampowered.com',
     withCredentials: true,
 });
 
 const url = 'https://store.steampowered.com/account/history/'; // Replace with the actual URL
-
-async function parseTable() {
-  try {
-    // 1. Fetch the HTML content
-    const response = await instance.get('app/1166860');
-    const html = response.data;
-    console.log('HTML content fetched successfully');
-
-    // 2. Load the HTML into Cheerio
-    const $ = cheerio.load(html);
-
-    console.log('HTML content loaded into Cheerio');
-    // Array to store the extracted data
-    const tableData = [];
-
-    // 3. Select the table and iterate through its rows
-    // Replace 'table_selector' with the actual CSS selector for your table
-    $('.discount_original_price').each((i, row) => {
-      const rowData = $(row).text();
-      console.log(rowData);
-
-      // Push the row data object into the main array
-      tableData.push(rowData);
-    });
-
-    // 5. Output the data (e.g., as JSON)
-    console.log(JSON.stringify(tableData, null, 2));
-
-  } catch (error) {
-    console.error(`Error fetching or parsing the page: ${error}`);
-  }
-}
 
 dotenv.config();
 
@@ -205,57 +176,98 @@ app.get('/', (req, res) => {
     res.status(200).send(user);
 });
 
+// Endpoint to fetch owned games from Steam API with simple pagination.
+// Query parameters:
+//   length - number of records per page (default 50)
+//   page   - 1‑based page index (default 1)
 app.get('/api/v1/steam/owned-games', async (req, res) => {
-    console.log("Fetching owned games for user...");
-    console.log('Session ID:', req.sessionID);
-    console.log('Session data:', req.session);
+    console.log(`${getLogPrefix}${req.originalUrl}`);
     const {user} = req.session;
-    console.log('User session:', user);
     if (!user) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    const length = Math.max(1, parseInt(req.query.length, 10) || 50);
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+
     try {
-        console.log("Running..");
         const steamid64 = user.steamid64;
         const response = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?include_appinfo=true&include_extended_appinfo=true&key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`);
-        if(response.data == null)
-        {
-            console.log("Response data is null, user needs to set their game details to public in order to fetch owned games. User Tab -> Profile, Edit Profile -> Privacy Settings -> My Profile -> Game details -> Public");
+        const allGames = (response.data && response.data.response && response.data.response.games) || [];
+
+        if (!allGames.length) {
+            console.log("Response data is null or empty, user needs to set their game details to public in order to fetch owned games.");
         }
-        res.json(response.data);
+
+        const total = allGames.length;
+        const start = (page - 1) * length;
+        const paginated = allGames.slice(start, start + length);
+
+        res.json({ total, games: paginated });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to fetch owned games' });
     }
 });
 
-app.get(`/api/v1/steam/details/:appId/price`, async (req, res) => {
-    console.log("Fetching game pricing information for app ID:", req.params.appId);
-    const {appId} = req.params;
+// Endpoint to fetch game pricing information from Steam store page - appIds are expected in the request body
+app.post(`/api/v1/steam/games/prices`, async (req, res) => {
+    console.log(`${postLogPrefix}${req.originalUrl}`);
+    const appIdArray = req.body.appIds || [];
     try {
-        const response = await instance.get(`app/${appId}`);
-        const html = response.data;
-        const $ = cheerio.load(html);
+        // fetch each page in parallel and build the result array
+        const priceData = await Promise.all(
+            appIdArray.map(async (game) => {
+                try {
+                    console.log("Fetching price for game:", game);
+                    // steamstore often blocks non-browser requests; give a common UA
+                    const response = await instance.get(`app/${game}`, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                                          'AppleWebKit/537.36 (KHTML, like Gecko) ' +
+                                          'Chrome/120.0.0.0 Safari/537.36',
+                        },
+                    });
+                    const html = response.data;
+                    const $ = cheerio.load(html);
 
-        const baseSelector = '.game_purchase_price';
-        const discountSelector = '.discount_original_price';
+                    const baseSelector = '.game_purchase_price';
+                    const discountSelector = '.discount_original_price';
 
-        let priceData = 0;
+                    let price = -1; // default when nothing matches
+                    if ($(baseSelector).length) {
+                        price = $(baseSelector).first().text().trim();
+                    } else if ($(discountSelector).length) {
+                        price = $(discountSelector).first().text().trim();
+                    }
 
-        if ($(baseSelector).length) {
-            const basePrice = $(baseSelector).first().text().trim();
-            priceData = basePrice;
-        } else if ($(discountSelector).length) {
-            const discountPrice = $(discountSelector).first().text().trim();
-            priceData = discountPrice;
-        } else {
-            priceData = -1; // No price data available
-        }
-
+                    return {
+                        appid: game,
+                        priceData: price,
+                    };
+                } catch (err) {
+                    // log and return placeholder instead of crashing entire request
+                    if (err.response) {
+                        console.warn(`could not fetch store page for ${game}: ` +
+                                     `${err.response.status} ${err.response.statusText}`);
+                    } else {
+                        console.warn(`could not fetch store page for ${game}:`, err.message);
+                    }
+                    return {
+                        appid: game,
+                        priceData: null,
+                    };
+                }
+            })
+        );
+        console.log("Finished fetching prices:", priceData);
         res.json({ priceData });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to fetch game pricing information' });
+        console.error('Failed to fetch game pricing information:', error);
+        // if headers already sent just abort
+        if (!res.headersSent) {
+            res.status(500).json({ error: 'Failed to fetch game pricing information' });
+        }
     }
 });
 
