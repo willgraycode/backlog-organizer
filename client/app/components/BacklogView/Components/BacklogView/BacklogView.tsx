@@ -42,7 +42,6 @@ export default function BacklogView() {
                     gamesMap.push(gameData);
                 });
                 const uniqueNewGames = gamesMap.filter(g => !ownedGames.some(og => og.appid === g.appid));
-                console.log("New games to add:", uniqueNewGames);
                 setOwnedGames(prev => [...prev, ...uniqueNewGames]);
                 setTotalGames(response.data.total || 0);
             } catch (error) {
@@ -88,7 +87,6 @@ export default function BacklogView() {
         }
         const unFetchedPrices = ownedGames.filter(g => g.basePrice === undefined);
         if (!unFetchedPrices.length) {
-            console.log("All games already have price data, skipping fetch");
             return;
         } else {
             fetchPrices();
