@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import BacklogTable from "../BacklogTable/BacklogTable";
 import axios from "axios";
+import { Pagination } from "@mantine/core"; // used for paging controls
 
 export interface BacklogEntry {
     name: string;
     appid: number;
     playtime_forever: number;
     rtime_last_played: number;
-    basePrice?: number;
+    basePrice?: number | undefined;
 
 }
 
@@ -15,57 +16,105 @@ export interface BacklogEntry {
 export default function BacklogView() {
 
     const [ownedGames, setOwnedGames] = useState<BacklogEntry[]>([]);
-    const [pricesFetched, setPricesFetched] = useState(false);
+    const [totalOwnedGames, setTotalOwnedGames] = useState(0);
+    const [page, setPage] = useState(1);
+    const [totalGames, setTotalGames] = useState(0);
+    const perPage = 20; // adjust as desired
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const response = await axios.get("https://127.0.0.1:3000/api/v1/steam/owned-games", { withCredentials: true });
+                const response = await axios.get(
+                    `https://127.0.0.1:3000/api/v1/steam/owned-games?length=${perPage}&page=${page}`,
+                    { withCredentials: true }
+                );
+
                 const gamesMap: BacklogEntry[] = [];
-                response.data.response.games.forEach((game: BacklogEntry) => {
+                const dataGames = response.data.games || [];
+                setTotalOwnedGames(response.data.total || 0);
+                dataGames.forEach((game: BacklogEntry) => {
                     const gameData = {
                         name: game.name,
                         appid: game.appid,
                         playtime_forever: game.playtime_forever,
-                        rtime_last_played: game.rtime_last_played
+                        rtime_last_played: game.rtime_last_played,
                     };
                     gamesMap.push(gameData);
                 });
-                console.log("Setting owned games");
-                setOwnedGames(gamesMap);
+                const uniqueNewGames = gamesMap.filter(g => !ownedGames.some(og => og.appid === g.appid));
+                console.log("New games to add:", uniqueNewGames);
+                setOwnedGames(prev => [...prev, ...uniqueNewGames]);
+                setTotalGames(response.data.total || 0);
             } catch (error) {
                 console.error("Error fetching owned games:", error);
             }
         };
         fetchData();
-    }, []);
+    }, [page]);
 
     useEffect(() => {
-        console.log("fetching prices...");
         if (!ownedGames.length) {
             console.log("No owned games, skipping price fetch");
             return;
         }
         const fetchPrices = async () => {
             try {
-                ownedGames.map(async game => {
-                    const response = await axios.get(`https://127.0.0.1:3000/api/v1/steam/details/${game.appid}/price`, { withCredentials: true });
-                    console.log(response.data);
-                    game.basePrice = response.data.priceData;
-                    setOwnedGames([...ownedGames.filter(g => g.appid !== game.appid), game]);
-                });
-                setPricesFetched(true);
-                console.log("Finished fetching prices");
+                
+                // send a flat array of IDs; the previous version wrapped the map result
+                // in an extra array which made appIdArray a 2‑D array on the server
+                const response = await axios.post(
+                    `https://127.0.0.1:3000/api/v1/steam/games/prices`,
+                    { appIds: unFetchedPrices.map(g => g.appid) },
+                    { withCredentials: true }
+                );
+
+                // update entries in one pass rather than kicking off a state update per game
+                const priceData: { appid: number; priceData: any }[] = response.data.priceData || [];
+                setOwnedGames(current =>
+                    current.map(game => {
+                        if (game.basePrice !== undefined) {
+                            return game;
+                        }
+                        const match = priceData.find(d => d.appid === game.appid);
+                        return {
+                            ...game,
+                            basePrice: match ? match.priceData : "No price data",
+                        };
+                    })
+                );
             } catch (error) {
                 console.error("Error fetching game prices:", error);
             }
         }
-        if (!pricesFetched) {
+        const unFetchedPrices = ownedGames.filter(g => g.basePrice === undefined);
+        if (!unFetchedPrices.length) {
+            console.log("All games already have price data, skipping fetch");
+            return;
+        } else {
             fetchPrices();
         }
-    }, [ownedGames, pricesFetched]);
+        
+    }, [ownedGames]);
 
-  return <div>
-    <BacklogTable ownedGames={ownedGames}></BacklogTable>
-  </div>;
+  return (
+    <div>
+        <div className="mt-4 flex justify-center">
+        <Pagination
+          page={page}
+          onChange={setPage}
+          total={Math.ceil(totalGames / perPage)}
+        />
+      </div>
+      <BacklogTable ownedGames={ownedGames.slice((page - 1) * perPage, page * perPage)}></BacklogTable>
+
+      {/* pagination controls */}
+      <div className="mt-4 flex justify-center">
+        <Pagination
+          page={page}
+          onChange={setPage}
+          total={Math.ceil(totalGames / perPage)}
+        />
+      </div>
+    </div>
+  );
 }
