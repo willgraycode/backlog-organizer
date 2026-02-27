@@ -95,8 +95,8 @@ export default function BacklogView() {
     <div>
         <div className="mb-4 flex justify-center">
         <Pagination
-          page={page}
           onChange={setPage}
+          value={page}
           total={Math.ceil(totalGames / perPage)}
         />
       </div>
@@ -105,8 +105,8 @@ export default function BacklogView() {
       {/* pagination controls */}
       <div className="mt-4 flex justify-center">
         <Pagination
-          page={page}
           onChange={setPage}
+          value={page}
           total={Math.ceil(totalGames / perPage)}
         />
       </div>
