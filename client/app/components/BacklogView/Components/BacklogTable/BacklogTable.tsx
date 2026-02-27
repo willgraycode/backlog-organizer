@@ -16,7 +16,7 @@ export default function BacklogTable (props: BacklogTableProps): React.JSX.Eleme
     return (
       <Table.Tr color="#171a21" key={game.name}>
         <Table.Td>
-            <Image src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`} w={120} h={50} radius="md"/>
+            <Image src={`https://cdn.akamai.steamstatic.com/steam/apps/${game.appid}/header.jpg`} w={120} h={50} radius="md" fallbackSrc="assets/SteamDefaultHeader.jpg"/>
         </Table.Td>
         <Table.Td>
           <Anchor fz="sm" href={`https://store.steampowered.com/app/${game.appid}`} target="_blank">
