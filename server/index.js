@@ -19,7 +19,8 @@ const instance = axios.create({
     withCredentials: true,
 });
 
-const url = 'https://store.steampowered.com/account/history/'; // Replace with the actual URL
+const BIRTHTIME_TIMESTAMP = '283993201'; 
+const MATURE_CONTENT_VALUE = '1';
 
 dotenv.config();
 
@@ -192,7 +193,13 @@ app.get('/api/v1/steam/owned-games', async (req, res) => {
 
     try {
         const steamid64 = user.steamid64;
-        const response = await axios.get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?include_appinfo=true&include_extended_appinfo=true&key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`);
+        const response = await axios.get(
+            `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?include_appinfo=true&include_extended_appinfo=true&key=${process.env.STEAM_API_KEY}&steamid=${steamid64}&format=json`,
+            {
+                headers: {
+                'Cookie': `birthtime=${BIRTHTIME_TIMESTAMP}; mature_content=${MATURE_CONTENT_VALUE};`
+            }},
+        );
         const allGames = (response.data && response.data.response && response.data.response.games) || [];
 
         if (!allGames.length) {
@@ -226,6 +233,7 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
                                           'AppleWebKit/537.36 (KHTML, like Gecko) ' +
                                           'Chrome/120.0.0.0 Safari/537.36',
+                            'Cookie': `birthtime=${BIRTHTIME_TIMESTAMP}; mature_content=${MATURE_CONTENT_VALUE};`
                         },
                     });
                     const html = response.data;
