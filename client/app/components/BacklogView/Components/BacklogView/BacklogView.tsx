@@ -12,19 +12,17 @@ export interface BacklogEntry {
 }
 
 export default function BacklogView() {
-  // store games by page to support jumping pages without loading intermediate ones
   const [ownedGamesByPage, setOwnedGamesByPage] = useState<
     Record<number, BacklogEntry[]>
   >({});
   const [totalOwnedGames, setTotalOwnedGames] = useState(0);
   const [page, setPage] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
-  const perPage = 20; // adjust as desired
+  const perPage = 20;
 
   useEffect(() => {
     const fetchData = async () => {
       if (ownedGamesByPage[page]) {
-        // already have this page
         return;
       }
       try {
@@ -57,7 +55,6 @@ export default function BacklogView() {
   useEffect(() => {
     const currentPageGames = ownedGamesByPage[page] || [];
     if (!currentPageGames.length) {
-      // nothing to price yet
       return;
     }
 
