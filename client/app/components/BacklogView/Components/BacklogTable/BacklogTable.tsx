@@ -22,7 +22,7 @@ export default function BacklogTable(props: BacklogTableProps) {
         game &&
         typeof game === "object" &&
         "basePrice" in game &&
-        game.basePrice
+        game.basePrice != null
       ) {
         return (
           <Table.Tr color="#171a21" key={game.appid}>
