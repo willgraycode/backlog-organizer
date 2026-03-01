@@ -64,8 +64,6 @@ export default function BacklogView() {
           `https://127.0.0.1:3000/api/v1/steam/games/prices`,
           {
             appIds: unFetchedPrices.map((g) => g.appid),
-            page: page,
-            perPage: perPage,
           },
           { withCredentials: true },
         );
