@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import BacklogTable from "../BacklogTable/BacklogTable";
 import axios from "axios";
 import { Pagination } from "@mantine/core"; // used for paging controls
+import { useSearchParams } from "react-router";
 
 export interface BacklogEntry {
   name: string;
@@ -16,7 +17,8 @@ export default function BacklogView() {
     Record<number, BacklogEntry[]>
   >({});
   const [totalOwnedGames, setTotalOwnedGames] = useState(0);
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const [totalGames, setTotalGames] = useState(0);
   const perPage = 20;
 
@@ -103,7 +105,7 @@ export default function BacklogView() {
     <div>
       <div className="mb-4 flex justify-center">
         <Pagination
-          onChange={setPage}
+          onChange={(p) => setSearchParams({ page: String(p) })}
           value={page}
           total={Math.ceil(totalGames / perPage)}
         />
@@ -113,7 +115,7 @@ export default function BacklogView() {
       {/* pagination controls */}
       <div className="mt-4 flex justify-center">
         <Pagination
-          onChange={setPage}
+          onChange={(p) => setSearchParams({ page: String(p) })}
           value={page}
           total={Math.ceil(totalGames / perPage)}
         />
