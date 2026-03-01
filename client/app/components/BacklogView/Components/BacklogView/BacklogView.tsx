@@ -41,14 +41,7 @@ export default function BacklogView() {
         const uniqueNewGames = gamesMap.filter(
           (g) => !ownedGames.some((og) => og.appid === g.appid),
         );
-        setOwnedGames((prev) => {
-          const combined = [
-            ...prev.splice(0, (page - 1) * perPage),
-            ...uniqueNewGames,
-            ...prev.splice((page - 1) * perPage),
-          ];
-          return combined;
-        });
+        setOwnedGames((prev) => [...prev, ...uniqueNewGames]);
         setTotalGames(response.data.total || 0);
       } catch (error) {
         console.error("Error fetching owned games:", error);
@@ -58,11 +51,11 @@ export default function BacklogView() {
   }, [page]);
 
   useEffect(() => {
-    console.log(ownedGames);
     if (!ownedGames.length) {
       console.log("No owned games, skipping price fetch");
       return;
     }
+    console.log(ownedGames);
     const fetchPrices = async () => {
       try {
         // send a flat array of IDs; the previous version wrapped the map result

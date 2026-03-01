@@ -221,11 +221,10 @@ app.get('/api/v1/steam/owned-games', async (req, res) => {
 app.post(`/api/v1/steam/games/prices`, async (req, res) => {
     console.log(`${postLogPrefix}${req.originalUrl}`);
     const appIdArray = req.body.appIds || [];
-    const split = req.body.page * req.body.perPage;
     try {
         // fetch each page in parallel and build the result array
         const priceData = await Promise.all(
-            appIdArray.map(async (game, index) => {
+            appIdArray.map(async (game) => {
                 try {
                     console.log("Fetching price for game:", game);
                     // steamstore often blocks non-browser requests; give a common UA
@@ -272,7 +271,6 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
 
                         if (/\bfree\b/.test(normalized)) {
                             return {
-                                place: split + index,
                                 appid: game,
                                 priceData: 'Free',
                             };
@@ -282,7 +280,6 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                         const parsed = parseFloat(numericStr);
                         if (Number.isFinite(parsed)) {
                             return {
-                                place: split + index,
                                 appid: game,
                                 priceData: parsed,
                             };
@@ -291,13 +288,11 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                         // fallback: keep raw string if parsing failed
                         console.warn(`Could not parse price for game ${game}:`, price);
                         return {
-                            place: split + index,
                             appid: game,
                             priceData: price,
                         };
                     } else {
                         return {
-                            place: split + index,
                             appid: game,
                             priceData: price,
                         };
@@ -312,7 +307,6 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                         console.warn(`could not fetch store page for ${game}:`, err.message);
                     }
                     return {
-                        place: split + index,
                         appid: game,
                         priceData: null,
                     };
