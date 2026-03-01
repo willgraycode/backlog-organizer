@@ -221,10 +221,11 @@ app.get('/api/v1/steam/owned-games', async (req, res) => {
 app.post(`/api/v1/steam/games/prices`, async (req, res) => {
     console.log(`${postLogPrefix}${req.originalUrl}`);
     const appIdArray = req.body.appIds || [];
+    const split = req.body.page * req.body.perPage;
     try {
         // fetch each page in parallel and build the result array
         const priceData = await Promise.all(
-            appIdArray.map(async (game) => {
+            appIdArray.map(async (game, index) => {
                 try {
                     console.log("Fetching price for game:", game);
                     // steamstore often blocks non-browser requests; give a common UA
@@ -242,17 +243,66 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                     const baseSelector = '.game_purchase_price';
                     const discountSelector = '.discount_original_price';
 
-                    let price = -1; // default when nothing matches
+                    let price = "Not Available"; // default when nothing matches
                     if ($(baseSelector).length) {
-                        price = $(baseSelector).first().text().trim();
+                        if ($(baseSelector).first().text().trim().toLowerCase().includes('demo')) {
+                            price = $(baseSelector).eq(1).text().trim();
+                            console.log(`Game ${game} has a demo price:`, price);
+                        } else {
+                            price = $(baseSelector).first().text().trim();
+                        }
                     } else if ($(discountSelector).length) {
+                        if ($(baseSelector).first().text().trim().toLowerCase().includes('demo')) {
+                            price = $(discountSelector).eq(1).text().trim();
+                            console.log(`Game ${game} has a demo price:`, price);
+                        } else {
+                            price = $(discountSelector).first().text().trim();
+                        }
                         price = $(discountSelector).first().text().trim();
                     }
 
-                    return {
-                        appid: game,
-                        priceData: price,
-                    };
+                    if (price !== "Not Available") {
+                        // normalize whitespace and case so we reliably detect phrases like
+                        // "Free to play", "Free", "free-to-play" etc.
+                        const normalized = price
+                            .replace(/\u00A0/g, ' ') // non-breaking spaces from HTML
+                            .replace(/\s+/g, ' ')
+                            .toLowerCase()
+                            .trim();
+
+                        if (/\bfree\b/.test(normalized)) {
+                            return {
+                                place: split + index,
+                                appid: game,
+                                priceData: 'Free',
+                            };
+                        }
+
+                        const numericStr = price.replace(/[^0-9,.-]/g, '').replace(/,/g, '.');
+                        const parsed = parseFloat(numericStr);
+                        if (Number.isFinite(parsed)) {
+                            return {
+                                place: split + index,
+                                appid: game,
+                                priceData: parsed,
+                            };
+                        }
+
+                        // fallback: keep raw string if parsing failed
+                        console.warn(`Could not parse price for game ${game}:`, price);
+                        return {
+                            place: split + index,
+                            appid: game,
+                            priceData: price,
+                        };
+                    } else {
+                        return {
+                            place: split + index,
+                            appid: game,
+                            priceData: price,
+                        };
+                    }
+                    
                 } catch (err) {
                     // log and return placeholder instead of crashing entire request
                     if (err.response) {
@@ -262,6 +312,7 @@ app.post(`/api/v1/steam/games/prices`, async (req, res) => {
                         console.warn(`could not fetch store page for ${game}:`, err.message);
                     }
                     return {
+                        place: split + index,
                         appid: game,
                         priceData: null,
                     };
